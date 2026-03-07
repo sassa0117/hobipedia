@@ -10,9 +10,9 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "Hobipedia - ホビーコレクターWiki",
+  title: "Hobipedia - アニメグッズ相場データベース",
   description:
-    "アニメグッズ・一番くじの相場データベース&コレクション管理。DiscogsのようなホビーコレクターのためのWiki。",
+    "一番くじ・フィギュアの相場データベース&コレクション管理。みんなで作るホビーコレクターWiki。",
 };
 
 export default function RootLayout({
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body className={`${notoSansJP.variable} font-sans antialiased bg-gray-50 text-gray-900`}>
+      <body className={`${notoSansJP.variable} font-sans antialiased`}>
         <Header />
         <main className="min-h-screen">{children}</main>
       </body>

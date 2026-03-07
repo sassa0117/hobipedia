@@ -1,117 +1,184 @@
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { formatPrice } from "@/lib/utils";
 
-export default function Home() {
+export default async function Home() {
+  const [lotteryCount, itemCount, priceCount] = await Promise.all([
+    prisma.lottery.count(),
+    prisma.item.count(),
+    prisma.priceReport.count(),
+  ]);
+
+  const recentItems = await prisma.item.findMany({
+    take: 6,
+    orderBy: { createdAt: "desc" },
+    include: {
+      prize: { include: { lottery: true } },
+      priceReports: { orderBy: { reportedAt: "desc" }, take: 1 },
+    },
+  });
+
   return (
     <div>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-blue-800 to-indigo-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
-            Hobipedia
-          </h1>
-          <p className="text-lg md:text-xl text-blue-200 mb-2">
-            アニメグッズの相場データベース & コレクション管理
-          </p>
-          <p className="text-sm text-blue-300 mb-8">
-            一番くじ・フィギュア・アクスタ・缶バッジ — みんなで作る価格Wiki
-          </p>
-          <div className="flex justify-center gap-4">
-            <Link
-              href="/lottery"
-              className="bg-white text-blue-800 font-bold px-6 py-3 rounded-xl hover:bg-blue-50 transition-colors"
-            >
-              一番くじを探す
-            </Link>
-            <Link
-              href="/collection"
-              className="border-2 border-white/40 text-white font-bold px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
-            >
-              コレクションを始める
-            </Link>
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#7c5cfc]/10 via-transparent to-transparent" />
+        <div className="max-w-7xl mx-auto px-4 pt-20 pb-16 relative">
+          <div className="text-center max-w-2xl mx-auto">
+            <div className="series-tag mb-6 inline-block">EARLY ACCESS</div>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white mb-4 leading-tight">
+              アニメグッズの<br />
+              <span className="bg-gradient-to-r from-[#7c5cfc] to-[#a78bfa] bg-clip-text text-transparent">
+                相場データベース
+              </span>
+            </h1>
+            <p className="text-slate-400 text-lg mb-8 leading-relaxed">
+              一番くじ・フィギュアの実売相場をコミュニティで共有。<br className="hidden md:block" />
+              買う前に、売る前に、まずHobipediaで相場チェック。
+            </p>
+            <div className="flex justify-center gap-3">
+              <Link href="/lottery" className="btn-primary text-sm">
+                一番くじデータベースを見る
+              </Link>
+              <Link href="/collection" className="btn-outline text-sm">
+                コレクションを始める
+              </Link>
+            </div>
           </div>
+        </div>
+      </section>
+
+      {/* Stats - Discogs style: show database scale */}
+      <section className="border-y border-white/[0.06]" style={{ background: "var(--bg-secondary)" }}>
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-3 gap-8 text-center">
+            <StatBlock value={lotteryCount.toString()} label="ロット登録" />
+            <StatBlock value={itemCount.toString()} label="アイテム" />
+            <StatBlock value={priceCount.toString()} label="相場データ" />
+          </div>
+        </div>
+      </section>
+
+      {/* Recent Items - MFC style: image-rich card grid */}
+      <section className="max-w-7xl mx-auto px-4 py-12">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-white">最近追加されたアイテム</h2>
+          <Link href="/lottery" className="text-sm text-[#a78bfa] hover:text-[#c4b5fd] transition-colors">
+            すべて見る &rarr;
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {recentItems.map((item) => {
+            const latestPrice = item.priceReports[0];
+            return (
+              <Link
+                key={item.id}
+                href={`/item/${item.slug}`}
+                className="card p-3 group"
+              >
+                {/* Image placeholder */}
+                <div className="aspect-square rounded-lg mb-3 flex items-center justify-center text-3xl"
+                  style={{ background: "var(--bg-elevated)" }}>
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover rounded-lg" />
+                  ) : (
+                    <span className="opacity-40">&#x1f381;</span>
+                  )}
+                </div>
+                {/* Series tag */}
+                <div className="series-tag text-[0.6rem] mb-1.5 truncate">
+                  {item.prize.lottery.series}
+                </div>
+                {/* Name */}
+                <div className="text-xs font-bold text-slate-200 leading-snug mb-1 line-clamp-2 group-hover:text-white transition-colors">
+                  {item.name}
+                </div>
+                {/* Character */}
+                {item.character && (
+                  <div className="text-[0.65rem] text-slate-500 mb-1.5 truncate">{item.character}</div>
+                )}
+                {/* Price */}
+                {latestPrice ? (
+                  <div className="text-sm font-black text-[#22c55e]">
+                    {formatPrice(latestPrice.price)}
+                  </div>
+                ) : (
+                  <div className="text-[0.65rem] text-slate-600">相場データなし</div>
+                )}
+              </Link>
+            );
+          })}
         </div>
       </section>
 
       {/* Features */}
-      <section className="max-w-7xl mx-auto px-4 py-16">
-        <h2 className="text-2xl font-black text-center mb-10">
-          Hobipediaでできること
-        </h2>
-        <div className="grid md:grid-cols-3 gap-8">
+      <section className="max-w-7xl mx-auto px-4 py-12">
+        <div className="grid md:grid-cols-3 gap-4">
           <FeatureCard
-            emoji="📊"
-            title="相場チェック"
-            description="メルカリ・ヤフオク・駿河屋の実売データから、リアルな相場がわかる。買う前に、売る前に。"
+            icon={<PriceIcon />}
+            title="リアルタイム相場"
+            desc="メルカリ・ヤフオク・駿河屋の実売データから相場を算出。条件別（未開封/開封済み）の価格がわかる。"
           />
           <FeatureCard
-            emoji="📦"
+            icon={<CollectionIcon />}
             title="コレクション管理"
-            description="持ってるもの・欲しいもの・売りたいものを一覧管理。資産価値もひと目でわかる。"
+            desc="持っている・欲しい・売りたいをワンタップ管理。MFC式のHave/Want統計で人気度も可視化。"
           />
           <FeatureCard
-            emoji="🌐"
-            title="みんなで作るWiki"
-            description="アイテム情報・相場報告をコミュニティで共有。Discogs式のコントリビューション。"
+            icon={<WikiIcon />}
+            title="コミュニティWiki"
+            desc="Discogs式のデータベース。アイテム情報・相場報告をみんなで編集・共有。"
           />
         </div>
       </section>
-
-      {/* Stats placeholder */}
-      <section className="bg-white border-y border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <StatBox label="登録アイテム" value="—" />
-            <StatBox label="相場データ" value="—" />
-            <StatBox label="コレクター" value="—" />
-            <StatBox label="対応カテゴリ" value="一番くじ" />
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-8">
-          <p className="text-lg font-bold text-amber-900 mb-2">
-            現在アーリーアクセス中
-          </p>
-          <p className="text-sm text-amber-700 mb-4">
-            一番くじカテゴリからスタート。フィギュア・アクスタ・缶バッジは順次追加予定。
-          </p>
-          <Link
-            href="/lottery"
-            className="inline-block bg-amber-500 text-white font-bold px-6 py-3 rounded-xl hover:bg-amber-600 transition-colors"
-          >
-            一番くじデータベースを見る
-          </Link>
-        </div>
-      </section>
     </div>
   );
 }
 
-function FeatureCard({
-  emoji,
-  title,
-  description,
-}: {
-  emoji: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-      <div className="text-4xl mb-3">{emoji}</div>
-      <h3 className="text-lg font-bold mb-2">{title}</h3>
-      <p className="text-sm text-gray-600 leading-relaxed">{description}</p>
-    </div>
-  );
-}
-
-function StatBox({ label, value }: { label: string; value: string }) {
+function StatBlock({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <div className="text-2xl font-black text-blue-800">{value}</div>
-      <div className="text-sm text-gray-500 mt-1">{label}</div>
+      <div className="text-2xl md:text-3xl font-black bg-gradient-to-r from-[#7c5cfc] to-[#a78bfa] bg-clip-text text-transparent">
+        {value}
+      </div>
+      <div className="text-xs text-slate-500 mt-1">{label}</div>
     </div>
+  );
+}
+
+function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+  return (
+    <div className="card p-5">
+      <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-3"
+        style={{ background: "var(--accent-muted)" }}>
+        {icon}
+      </div>
+      <h3 className="text-sm font-bold text-white mb-2">{title}</h3>
+      <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
+    </div>
+  );
+}
+
+function PriceIcon() {
+  return (
+    <svg className="w-5 h-5 text-[#a78bfa]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+    </svg>
+  );
+}
+
+function CollectionIcon() {
+  return (
+    <svg className="w-5 h-5 text-[#a78bfa]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+    </svg>
+  );
+}
+
+function WikiIcon() {
+  return (
+    <svg className="w-5 h-5 text-[#a78bfa]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
   );
 }

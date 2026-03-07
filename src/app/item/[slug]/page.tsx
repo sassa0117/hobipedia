@@ -2,13 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatDate, formatPrice } from "@/lib/utils";
-import { PriceSource } from "@/generated/prisma";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+const SOURCE_LABELS: Record<string, string> = {
+  MERCARI: "メルカリ",
+  YAHOO_AUCTION: "ヤフオク",
+  YAHOO_FREEMARKET: "Yahoo!フリマ",
+  SURUGAYA: "駿河屋",
+  MANDARAKE: "まんだらけ",
+  LASHINBAN: "らしんばん",
+  AMAZON: "Amazon",
+  USER_REPORT: "ユーザー報告",
+  OTHER: "その他",
+};
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const item = await prisma.item.findUnique({
     where: { slug },
@@ -21,24 +28,13 @@ export async function generateMetadata({
   };
 }
 
-export default async function ItemDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function ItemDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const item = await prisma.item.findUnique({
     where: { slug },
     include: {
-      prize: {
-        include: {
-          lottery: true,
-        },
-      },
-      priceReports: {
-        orderBy: { reportedAt: "desc" },
-        take: 50,
-      },
+      prize: { include: { lottery: true } },
+      priceReports: { orderBy: { reportedAt: "desc" }, take: 50 },
       comments: {
         orderBy: { createdAt: "desc" },
         take: 20,
@@ -51,104 +47,120 @@ export default async function ItemDetailPage({
   if (!item) notFound();
 
   const lottery = item.prize.lottery;
-
-  // Calculate price stats
   const prices = item.priceReports.map((r) => r.price);
   const avgPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
   const minPrice = prices.length > 0 ? Math.min(...prices) : null;
   const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
+  const latestPrice = item.priceReports[0];
+
+  // Price trend (compare latest vs average)
+  const priceTrend = latestPrice && avgPrice
+    ? latestPrice.price > avgPrice ? "up" : latestPrice.price < avgPrice ? "down" : "neutral"
+    : "neutral";
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Breadcrumb */}
-      <nav className="text-sm text-gray-500 mb-6">
-        <Link href="/lottery" className="hover:text-blue-700">一番くじ</Link>
-        <span className="mx-2">/</span>
-        <Link href={`/lottery/${lottery.slug}`} className="hover:text-blue-700">
+      <nav className="text-xs text-slate-500 mb-6 flex items-center gap-1.5 flex-wrap">
+        <Link href="/lottery" className="hover:text-[#a78bfa] transition-colors">一番くじ</Link>
+        <span className="text-slate-700">/</span>
+        <Link href={`/lottery/${lottery.slug}`} className="hover:text-[#a78bfa] transition-colors">
           {lottery.name}
         </Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-900">{item.prize.grade}</span>
+        <span className="text-slate-700">/</span>
+        <span className="text-slate-300">{item.prize.grade}</span>
       </nav>
 
-      <div className="grid lg:grid-cols-3 gap-8">
-        {/* Main content */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* ===== Main Column ===== */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Item header */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <div className="text-sm font-medium text-blue-600 mb-1">
-              {lottery.name} — {item.prize.grade}
+
+          {/* Item Header Card */}
+          <div className="card p-6">
+            <div className="flex items-start gap-2 mb-1">
+              <div className="series-tag text-[0.6rem]">{lottery.series}</div>
+              <span className="text-[0.6rem] text-slate-600">{item.prize.grade}</span>
             </div>
-            <h1 className="text-2xl font-black mb-2">{item.name}</h1>
+            <h1 className="text-xl md:text-2xl font-black text-white mb-1">{item.name}</h1>
             {item.character && (
-              <div className="text-sm text-gray-500 mb-4">
-                キャラクター: {item.character}
-              </div>
+              <div className="text-sm text-slate-500 mb-4">{item.character}</div>
             )}
 
-            {/* Price stats */}
+            {/* PriceCharting-style: Price stats with trend indicator */}
             {avgPrice ? (
-              <div className="grid grid-cols-3 gap-4 mt-4">
-                <PriceStat label="平均相場" value={avgPrice} color="text-blue-800" />
-                <PriceStat label="最安値" value={minPrice!} color="text-green-700" />
-                <PriceStat label="最高値" value={maxPrice!} color="text-red-600" />
+              <div className="grid grid-cols-3 gap-3 mt-4">
+                <PriceStat
+                  label="最新相場"
+                  value={latestPrice?.price ?? avgPrice}
+                  trend={priceTrend}
+                  source={latestPrice ? SOURCE_LABELS[latestPrice.source] || latestPrice.source : undefined}
+                />
+                <PriceStat label="最安値" value={minPrice!} variant="low" />
+                <PriceStat label="最高値" value={maxPrice!} variant="high" />
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-xl p-4 text-center text-sm text-gray-500">
+              <div className="rounded-lg p-4 text-center text-xs text-slate-500 mt-4"
+                style={{ background: "var(--bg-elevated)" }}>
                 まだ相場データがありません。最初の報告をお待ちしています。
               </div>
             )}
+
+            {/* MFC-style: Collection stats */}
+            <div className="flex items-center gap-4 mt-4 pt-4 border-t border-white/[0.06]">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-[#22c55e]" />
+                <span className="text-xs text-slate-400">
+                  <span className="font-bold text-slate-200">{item._count.collections}</span> コレクション中
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-[#a78bfa]" />
+                <span className="text-xs text-slate-400">
+                  <span className="font-bold text-slate-200">{item._count.priceReports}</span> 相場報告
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* Price history */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <h2 className="text-lg font-bold mb-4">
-              相場履歴
-              <span className="ml-2 text-sm font-normal text-gray-400">
-                ({item._count.priceReports}件)
-              </span>
-            </h2>
+          {/* Price History Table (PriceCharting ref: dense data table) */}
+          <div className="card overflow-hidden">
+            <div className="px-5 py-3 border-b border-white/[0.06]" style={{ background: "var(--bg-elevated)" }}>
+              <h2 className="text-sm font-bold text-white">
+                相場履歴
+                <span className="ml-2 text-xs font-normal text-slate-500">
+                  ({item._count.priceReports}件)
+                </span>
+              </h2>
+            </div>
             {item.priceReports.length === 0 ? (
-              <p className="text-sm text-gray-400">データなし</p>
+              <div className="p-6 text-center text-xs text-slate-600">データなし</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="data-table">
                   <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 font-medium text-gray-500">日時</th>
-                      <th className="text-right py-2 font-medium text-gray-500">価格</th>
-                      <th className="text-left py-2 font-medium text-gray-500">ソース</th>
-                      <th className="text-left py-2 font-medium text-gray-500">状態</th>
+                    <tr>
+                      <th>日時</th>
+                      <th className="text-right">価格</th>
+                      <th>ソース</th>
+                      <th>状態</th>
                     </tr>
                   </thead>
                   <tbody>
                     {item.priceReports.map((report) => (
-                      <tr key={report.id} className="border-b border-gray-100">
-                        <td className="py-2 text-gray-600">
-                          {formatDate(report.reportedAt)}
-                        </td>
-                        <td className="py-2 text-right font-bold">
-                          {formatPrice(report.price)}
-                        </td>
-                        <td className="py-2">
+                      <tr key={report.id}>
+                        <td className="text-slate-400 text-xs">{formatDate(report.reportedAt)}</td>
+                        <td className="text-right font-bold text-white">{formatPrice(report.price)}</td>
+                        <td>
                           {report.sourceUrl ? (
-                            <a
-                              href={report.sourceUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline"
-                            >
-                              {sourceLabel(report.source)}
+                            <a href={report.sourceUrl} target="_blank" rel="noopener noreferrer"
+                              className="text-[#a78bfa] hover:text-[#c4b5fd] text-xs">
+                              {SOURCE_LABELS[report.source] || report.source}
                             </a>
                           ) : (
-                            <span className="text-gray-600">
-                              {sourceLabel(report.source)}
-                            </span>
+                            <span className="text-xs">{SOURCE_LABELS[report.source] || report.source}</span>
                           )}
                         </td>
-                        <td className="py-2 text-gray-500">
-                          {report.condition || "—"}
-                        </td>
+                        <td className="text-xs">{report.condition || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -158,91 +170,70 @@ export default async function ItemDetailPage({
           </div>
 
           {/* Comments */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <h2 className="text-lg font-bold mb-4">コメント</h2>
-            {item.comments.length === 0 ? (
-              <p className="text-sm text-gray-400">
-                まだコメントがありません
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {item.comments.map((comment) => (
-                  <div
-                    key={comment.id}
-                    className="border-b border-gray-100 pb-4 last:border-0"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium">
-                        {comment.user.displayName || comment.user.name || "匿名"}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {formatDate(comment.createdAt)}
-                      </span>
+          <div className="card overflow-hidden">
+            <div className="px-5 py-3 border-b border-white/[0.06]" style={{ background: "var(--bg-elevated)" }}>
+              <h2 className="text-sm font-bold text-white">コメント</h2>
+            </div>
+            <div className="p-5">
+              {item.comments.length === 0 ? (
+                <p className="text-xs text-slate-600">まだコメントがありません</p>
+              ) : (
+                <div className="space-y-4">
+                  {item.comments.map((comment) => (
+                    <div key={comment.id} className="border-b border-white/[0.04] pb-3 last:border-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium text-slate-300">
+                          {comment.user.displayName || comment.user.name || "匿名"}
+                        </span>
+                        <span className="text-[0.6rem] text-slate-600">{formatDate(comment.createdAt)}</span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">{comment.body}</p>
                     </div>
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      {comment.body}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
+        {/* ===== Sidebar ===== */}
+        <div className="space-y-4">
           {/* Image */}
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="aspect-square bg-gray-100 flex items-center justify-center">
+          <div className="card overflow-hidden">
+            <div className="aspect-square flex items-center justify-center"
+              style={{ background: "var(--bg-elevated)" }}>
               {item.imageUrl ? (
-                <img
-                  src={item.imageUrl}
-                  alt={item.name}
-                  className="w-full h-full object-contain"
-                />
+                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain" />
               ) : (
-                <span className="text-6xl">🎁</span>
+                <span className="text-6xl opacity-20">&#x1f381;</span>
               )}
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
-            <button className="w-full bg-blue-700 text-white font-bold py-3 rounded-xl hover:bg-blue-800 transition-colors">
+          {/* Action Buttons */}
+          <div className="card p-4 space-y-2.5">
+            <button className="btn-primary w-full text-sm py-2.5">
               相場を報告する
             </button>
-            <button className="w-full border-2 border-blue-200 text-blue-700 font-bold py-3 rounded-xl hover:bg-blue-50 transition-colors">
+            <button className="btn-outline w-full text-sm py-2.5">
               コレクションに追加
             </button>
           </div>
 
-          {/* Info */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <h3 className="font-bold text-sm mb-3">アイテム情報</h3>
-            <dl className="text-sm space-y-2">
-              <div className="flex justify-between">
-                <dt className="text-gray-500">ロット</dt>
-                <dd className="font-medium">{lottery.name}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-500">賞</dt>
-                <dd className="font-medium">{item.prize.grade}</dd>
-              </div>
+          {/* Item Info (Discogs-style structured metadata) */}
+          <div className="card p-4">
+            <h3 className="text-xs font-bold text-white mb-3">アイテム情報</h3>
+            <dl className="space-y-2">
+              <InfoRow label="ロット" value={lottery.name} />
+              <InfoRow label="賞" value={item.prize.grade} />
               {item.prize.quantity && (
-                <div className="flex justify-between">
-                  <dt className="text-gray-500">当選本数</dt>
-                  <dd className="font-medium">{item.prize.quantity}個</dd>
-                </div>
+                <InfoRow label="当選本数" value={`${item.prize.quantity}個`} />
               )}
-              <div className="flex justify-between">
-                <dt className="text-gray-500">コレクター数</dt>
-                <dd className="font-medium">{item._count.collections}人</dd>
-              </div>
+              {item.character && (
+                <InfoRow label="キャラクター" value={item.character} />
+              )}
               {item.jan && (
-                <div className="flex justify-between">
-                  <dt className="text-gray-500">JAN</dt>
-                  <dd className="font-mono text-xs">{item.jan}</dd>
-                </div>
+                <InfoRow label="JAN" value={item.jan} mono />
               )}
             </dl>
           </div>
@@ -255,33 +246,48 @@ export default async function ItemDetailPage({
 function PriceStat({
   label,
   value,
-  color,
+  trend,
+  variant,
+  source,
 }: {
   label: string;
   value: number;
-  color: string;
+  trend?: "up" | "down" | "neutral";
+  variant?: "low" | "high";
+  source?: string;
 }) {
+  const color = variant === "low"
+    ? "text-[#22c55e]"
+    : variant === "high"
+      ? "text-[#ef4444]"
+      : trend === "up"
+        ? "text-[#22c55e]"
+        : trend === "down"
+          ? "text-[#ef4444]"
+          : "text-white";
+
+  const arrow = trend === "up" ? " ↑" : trend === "down" ? " ↓" : "";
+
   return (
-    <div className="bg-gray-50 rounded-xl p-3 text-center">
-      <div className="text-xs text-gray-500 mb-1">{label}</div>
-      <div className={`text-xl font-black ${color}`}>
-        {formatPrice(value)}
+    <div className="rounded-lg p-3 text-center" style={{ background: "var(--bg-elevated)" }}>
+      <div className="text-[0.6rem] text-slate-500 mb-1">{label}</div>
+      <div className={`text-lg font-black ${color}`}>
+        {formatPrice(value)}{arrow}
       </div>
+      {source && (
+        <div className="text-[0.55rem] text-slate-600 mt-0.5">{source}</div>
+      )}
     </div>
   );
 }
 
-function sourceLabel(source: PriceSource): string {
-  const labels: Record<PriceSource, string> = {
-    MERCARI: "メルカリ",
-    YAHOO_AUCTION: "ヤフオク",
-    YAHOO_FREEMARKET: "Yahoo!フリマ",
-    SURUGAYA: "駿河屋",
-    MANDARAKE: "まんだらけ",
-    LASHINBAN: "らしんばん",
-    AMAZON: "Amazon",
-    USER_REPORT: "ユーザー報告",
-    OTHER: "その他",
-  };
-  return labels[source] || source;
+function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex justify-between items-start gap-2">
+      <dt className="text-[0.7rem] text-slate-500 shrink-0">{label}</dt>
+      <dd className={`text-[0.7rem] text-slate-300 text-right ${mono ? "font-mono" : "font-medium"}`}>
+        {value}
+      </dd>
+    </div>
+  );
 }
