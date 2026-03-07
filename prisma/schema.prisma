@@ -1,0 +1,244 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================== Auth (NextAuth) ====================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ==================== Users ====================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  displayName   String?
+  bio           String?   @db.Text
+  locale        String    @default("ja")
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts     Account[]
+  sessions     Session[]
+  collections  CollectionItem[]
+  priceReports PriceReport[]
+  comments     Comment[]
+  itemEdits    ItemEdit[]
+}
+
+enum Role {
+  USER
+  CONTRIBUTOR
+  MODERATOR
+  ADMIN
+}
+
+// ==================== Catalog ====================
+
+// A Lottery = 一番くじのロット（例: "一番くじ ワンピース THE BEST EDITION"）
+model Lottery {
+  id          String    @id @default(cuid())
+  name        String    // 正式名称
+  nameEn      String?   // English name
+  slug        String    @unique
+  series      String    // 作品名（ワンピース、呪術廻戦 etc）
+  seriesEn    String?
+  maker       String    @default("BANDAI SPIRITS") // メーカー
+  releaseDate DateTime? // 発売日
+  price       Int?      // 1回の価格（円）
+  imageUrl    String?
+  description String?   @db.Text
+  sourceUrl   String?   // 公式ページURL
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  prizes Prize[]
+
+  @@index([series])
+  @@index([releaseDate])
+}
+
+// A Prize = 賞（A賞、B賞、ラストワン賞 etc）
+model Prize {
+  id        String @id @default(cuid())
+  lotteryId String
+  grade     String // A賞, B賞, C賞, D賞, E賞, ラストワン賞, etc
+  name      String // アイテム名（例: "マスターライズフィギュア ルフィ太郎"）
+  nameEn    String?
+  quantity  Int?   // 当選本数
+  imageUrl  String?
+
+  lottery Lottery @relation(fields: [lotteryId], references: [id], onDelete: Cascade)
+  items   Item[]
+
+  @@index([lotteryId])
+}
+
+// An Item = 個別アイテム（キャラ違いなど賞の中の具体的な商品）
+// 多くの場合 Prize = Item だが、C賞以下で複数キャラある場合に分かれる
+model Item {
+  id          String   @id @default(cuid())
+  prizeId     String
+  name        String   // 具体的な商品名
+  nameEn      String?
+  character   String?  // キャラクター名
+  characterEn String?
+  slug        String   @unique
+  imageUrl    String?
+  jan         String?  // JANコード（あれば）
+  category    Category @default(ICHIBAN_KUJI)
+  condition   String?  // 未開封、開封済み etc（デフォルト相場用）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  prize        Prize           @relation(fields: [prizeId], references: [id], onDelete: Cascade)
+  priceReports PriceReport[]
+  collections  CollectionItem[]
+  comments     Comment[]
+  edits        ItemEdit[]
+
+  @@index([prizeId])
+  @@index([character])
+  @@index([category])
+}
+
+enum Category {
+  ICHIBAN_KUJI  // 一番くじ
+  FIGURE        // フィギュア（プライズ以外）
+  ACSTA         // アクリルスタンド
+  CAN_BADGE     // 缶バッジ
+  PLUSH         // ぬいぐるみ
+  TRADING_CARD  // トレカ
+  OTHER
+}
+
+// ==================== Price Tracking ====================
+
+model PriceReport {
+  id         String      @id @default(cuid())
+  itemId     String
+  userId     String?     // null = system/scraper
+  price      Int         // 円
+  source     PriceSource
+  sourceUrl  String?     // 出品URL
+  condition  String?     // 未開封, 開封済み, 箱なし etc
+  soldAt     DateTime?   // 売れた日時
+  reportedAt DateTime    @default(now())
+  verified   Boolean     @default(false)
+
+  item Item  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([itemId, reportedAt])
+  @@index([itemId, source])
+}
+
+enum PriceSource {
+  MERCARI
+  YAHOO_AUCTION
+  YAHOO_FREEMARKET
+  SURUGAYA
+  MANDARAKE
+  LASHINBAN
+  AMAZON
+  USER_REPORT  // ユーザー手動報告
+  OTHER
+}
+
+// ==================== Collections ====================
+
+model CollectionItem {
+  id           String           @id @default(cuid())
+  userId       String
+  itemId       String
+  status       CollectionStatus @default(OWNED)
+  purchasePrice Int?            // 購入価格
+  note         String?
+  addedAt      DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+}
+
+enum CollectionStatus {
+  OWNED     // 持ってる
+  WANTED    // 欲しい
+  FOR_SALE  // 売りたい
+  SOLD      // 売った
+}
+
+// ==================== Community ====================
+
+model Comment {
+  id        String   @id @default(cuid())
+  itemId    String
+  userId    String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, createdAt])
+}
+
+// ==================== Edit History ====================
+
+model ItemEdit {
+  id        String   @id @default(cuid())
+  itemId    String
+  userId    String
+  field     String   // 変更されたフィールド名
+  oldValue  String?  @db.Text
+  newValue  String?  @db.Text
+  createdAt DateTime @default(now())
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, createdAt])
+}
