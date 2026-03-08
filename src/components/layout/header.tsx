@@ -1,10 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export function Header() {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = query.trim();
+    if (q) {
+      router.push(`/search?q=${encodeURIComponent(q)}`);
+    }
+  }
+
   return (
-    <header className="sticky top-0 z-50 bg-[#12162b] border-b border-white/[0.06]">
+    <header className="sticky top-0 z-50 bg-[#12162b]/95 backdrop-blur-md border-b border-white/[0.06]">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
@@ -17,18 +30,20 @@ export function Header() {
         </Link>
 
         {/* Search - Discogs style */}
-        <div className="hidden md:flex flex-1 max-w-md mx-8">
+        <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md mx-8">
           <div className="search-bar flex items-center w-full px-3 py-2 gap-2">
             <svg className="w-4 h-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
               type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               placeholder="作品名・アイテム名で検索..."
               className="w-full bg-transparent text-sm outline-none text-slate-200 placeholder:text-slate-600"
             />
           </div>
-        </div>
+        </form>
 
         {/* Nav */}
         <nav className="hidden md:flex items-center gap-1">
@@ -44,6 +59,22 @@ export function Header() {
           </Link>
         </div>
       </div>
+
+      {/* Mobile search */}
+      <form onSubmit={handleSearch} className="md:hidden px-4 pb-3">
+        <div className="search-bar flex items-center w-full px-3 py-2 gap-2">
+          <svg className="w-4 h-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="検索..."
+            className="w-full bg-transparent text-sm outline-none text-slate-200 placeholder:text-slate-600"
+          />
+        </div>
+      </form>
     </header>
   );
 }

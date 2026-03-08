@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
+import { FigurePlaceholder } from "@/components/ui/placeholders";
 
 export default async function Home() {
   const [lotteryCount, itemCount, priceCount] = await Promise.all([
@@ -82,7 +83,7 @@ export default async function Home() {
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover rounded-lg" />
                   ) : (
-                    <span className="opacity-40">&#x1f381;</span>
+                    <FigurePlaceholder />
                   )}
                 </div>
                 {/* Series tag */}

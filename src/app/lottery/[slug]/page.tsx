@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatDate, formatPrice } from "@/lib/utils";
+import { LotteryPlaceholder, ItemPlaceholder } from "@/components/ui/placeholders";
 // Grade badge color map (一番くじ公式 ref: 賞ヒエラルキー)
 const gradeBadge: Record<string, string> = {
   "A賞": "badge-a",
@@ -61,7 +62,7 @@ export default async function LotteryDetailPage({ params }: { params: Promise<{ 
             {lottery.imageUrl ? (
               <img src={lottery.imageUrl} alt={lottery.name} className="w-full h-full object-cover rounded-lg" />
             ) : (
-              <span className="text-5xl opacity-20">&#x1f3b0;</span>
+              <LotteryPlaceholder />
             )}
           </div>
 
@@ -130,7 +131,7 @@ export default async function LotteryDetailPage({ params }: { params: Promise<{ 
                             {item.imageUrl ? (
                               <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover rounded-lg" />
                             ) : (
-                              <span className="opacity-30">&#x1f381;</span>
+                              <ItemPlaceholder size="sm" />
                             )}
                           </div>
 

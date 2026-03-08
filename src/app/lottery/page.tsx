@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatDate, formatPrice } from "@/lib/utils";
+import { LotteryPlaceholder } from "@/components/ui/placeholders";
 
 export const metadata = {
   title: "一番くじ データベース - Hobipedia",
@@ -56,7 +57,7 @@ export default async function LotteryListPage() {
                   {lottery.imageUrl ? (
                     <img src={lottery.imageUrl} alt={lottery.name} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="text-5xl opacity-20">&#x1f3b0;</div>
+                    <LotteryPlaceholder />
                   )}
                   {/* Status badge */}
                   <div className="absolute top-3 left-3">

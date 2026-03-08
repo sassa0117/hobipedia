@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatDate, formatPrice } from "@/lib/utils";
+import { FigurePlaceholder } from "@/components/ui/placeholders";
+import { PriceReportForm } from "@/components/item/price-report-form";
+import { CollectionButton } from "@/components/item/collection-button";
 
 const SOURCE_LABELS: Record<string, string> = {
   MERCARI: "メルカリ",
@@ -205,19 +208,15 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ slu
               {item.imageUrl ? (
                 <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain" />
               ) : (
-                <span className="text-6xl opacity-20">&#x1f381;</span>
+                <FigurePlaceholder />
               )}
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="card p-4 space-y-2.5">
-            <button className="btn-primary w-full text-sm py-2.5">
-              相場を報告する
-            </button>
-            <button className="btn-outline w-full text-sm py-2.5">
-              コレクションに追加
-            </button>
+            <PriceReportForm itemId={item.id} />
+            <CollectionButton itemId={item.id} />
           </div>
 
           {/* Item Info (Discogs-style structured metadata) */}
