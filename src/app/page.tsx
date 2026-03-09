@@ -6,16 +6,18 @@ import { FigurePlaceholder } from "@/components/ui/placeholders";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [lotteryCount, itemCount, priceCount] = await Promise.all([
+  const [lotteryCount, itemCount, priceCount, seriesCount] = await Promise.all([
     prisma.lottery.count(),
     prisma.item.count(),
     prisma.priceReport.count(),
+    prisma.series.count(),
   ]);
 
   const recentItems = await prisma.item.findMany({
     take: 6,
     orderBy: { createdAt: "desc" },
     include: {
+      series: true,
       prize: { include: { lottery: true } },
       priceReports: { orderBy: { reportedAt: "desc" }, take: 1 },
     },
@@ -30,21 +32,21 @@ export default async function Home() {
           <div className="text-center max-w-2xl mx-auto">
             <div className="series-tag mb-6 inline-block">EARLY ACCESS</div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white mb-4 leading-tight">
-              アニメグッズの<br />
+              ホビーグッズの<br />
               <span className="bg-gradient-to-r from-[#7c5cfc] to-[#a78bfa] bg-clip-text text-transparent">
-                相場データベース
+                みんなで作るWiki
               </span>
             </h1>
             <p className="text-slate-400 text-lg mb-8 leading-relaxed">
-              一番くじ・フィギュアの実売相場をコミュニティで共有。<br className="hidden md:block" />
-              買う前に、売る前に、まずHobipediaで相場チェック。
+              フィギュア・一番くじ・トレカの情報と相場をコミュニティで共有。<br className="hidden md:block" />
+              誰でも商品を登録・編集できるホビーのWikipedia。
             </p>
             <div className="flex justify-center gap-3">
-              <Link href="/lottery" className="btn-primary text-sm">
-                一番くじデータベースを見る
+              <Link href="/item/new" className="btn-primary text-sm">
+                商品を登録する
               </Link>
-              <Link href="/collection" className="btn-outline text-sm">
-                コレクションを始める
+              <Link href="/lottery" className="btn-outline text-sm">
+                データベースを見る
               </Link>
             </div>
           </div>
@@ -54,8 +56,9 @@ export default async function Home() {
       {/* Stats - Discogs style: show database scale */}
       <section className="border-y border-white/[0.06]" style={{ background: "var(--bg-secondary)" }}>
         <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-3 gap-8 text-center">
-            <StatBlock value={lotteryCount.toString()} label="ロット登録" />
+          <div className="grid grid-cols-4 gap-8 text-center">
+            <StatBlock value={seriesCount.toString()} label="シリーズ" />
+            <StatBlock value={lotteryCount.toString()} label="ロット" />
             <StatBlock value={itemCount.toString()} label="アイテム" />
             <StatBlock value={priceCount.toString()} label="相場データ" />
           </div>
@@ -73,6 +76,7 @@ export default async function Home() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {recentItems.map((item) => {
             const latestPrice = item.priceReports[0];
+            const seriesName = item.series?.name || "";
             return (
               <Link
                 key={item.id}
@@ -89,9 +93,11 @@ export default async function Home() {
                   )}
                 </div>
                 {/* Series tag */}
+                {seriesName && (
                 <div className="series-tag text-[0.6rem] mb-1.5 truncate">
-                  {item.prize.lottery.series}
+                  {seriesName}
                 </div>
+                )}
                 {/* Name */}
                 <div className="text-xs font-bold text-slate-200 leading-snug mb-1 line-clamp-2 group-hover:text-white transition-colors">
                   {item.name}
@@ -118,19 +124,19 @@ export default async function Home() {
       <section className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid md:grid-cols-3 gap-4">
           <FeatureCard
+            icon={<WikiIcon />}
+            title="みんなで作るWiki"
+            desc="誰でも商品を登録・編集できる。フィギュア、一番くじ、トレカ、ぬいぐるみ。ホビーの百科事典をみんなで作ろう。"
+          />
+          <FeatureCard
             icon={<PriceIcon />}
             title="リアルタイム相場"
-            desc="メルカリ・ヤフオク・駿河屋の実売データから相場を算出。条件別（未開封/開封済み）の価格がわかる。"
+            desc="メルカリ・ヤフオク・駿河屋の実売データ、店舗発見価格、売りたい/買いたい希望価格をみんなで共有。"
           />
           <FeatureCard
             icon={<CollectionIcon />}
             title="コレクション管理"
-            desc="持っている・欲しい・売りたいをワンタップ管理。MFC式のHave/Want統計で人気度も可視化。"
-          />
-          <FeatureCard
-            icon={<WikiIcon />}
-            title="コミュニティWiki"
-            desc="Discogs式のデータベース。アイテム情報・相場報告をみんなで編集・共有。"
+            desc="持っている・欲しい・売りたいをワンタップ管理。公開/非公開の切り替えも自由。"
           />
         </div>
       </section>

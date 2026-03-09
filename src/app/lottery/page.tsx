@@ -14,6 +14,7 @@ export default async function LotteryListPage() {
   const lotteries = await prisma.lottery.findMany({
     orderBy: { releaseDate: "desc" },
     include: {
+      series: true,
       _count: { select: { prizes: true } },
       prizes: {
         include: {
@@ -79,7 +80,7 @@ export default async function LotteryListPage() {
 
                 {/* Content */}
                 <div className="p-4">
-                  <div className="series-tag text-[0.6rem] mb-2">{lottery.series}</div>
+                  {lottery.series && <div className="series-tag text-[0.6rem] mb-2">{lottery.series.name}</div>}
                   <h2 className="font-bold text-sm text-slate-200 leading-snug mb-2 group-hover:text-white transition-colors">
                     {lottery.name}
                   </h2>

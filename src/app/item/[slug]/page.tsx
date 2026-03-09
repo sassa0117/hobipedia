@@ -22,12 +22,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const item = await prisma.item.findUnique({
     where: { slug },
-    include: { prize: { include: { lottery: true } } },
+    include: { prize: { include: { lottery: true } }, series: true },
   });
   if (!item) return { title: "Not Found" };
+  const context = item.prize ? `${item.prize.lottery.name} ${item.prize.grade} ` : "";
   return {
     title: `${item.name} 相場・価格推移 - Hobipedia`,
-    description: `${item.prize.lottery.name} ${item.prize.grade} ${item.name}の相場データ。`,
+    description: `${context}${item.name}の相場データ。`,
   };
 }
 
@@ -36,6 +37,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ slu
   const item = await prisma.item.findUnique({
     where: { slug },
     include: {
+      series: true,
       prize: { include: { lottery: true } },
       priceReports: { orderBy: { reportedAt: "desc" }, take: 50 },
       comments: {
@@ -49,7 +51,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ slu
 
   if (!item) notFound();
 
-  const lottery = item.prize.lottery;
+  const lottery = item.prize?.lottery;
   const prices = item.priceReports.map((r) => r.price);
   const avgPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
   const minPrice = prices.length > 0 ? Math.min(...prices) : null;
@@ -65,13 +67,21 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ slu
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Breadcrumb */}
       <nav className="text-xs text-slate-500 mb-6 flex items-center gap-1.5 flex-wrap">
-        <Link href="/lottery" className="hover:text-[#a78bfa] transition-colors">一番くじ</Link>
-        <span className="text-slate-700">/</span>
-        <Link href={`/lottery/${lottery.slug}`} className="hover:text-[#a78bfa] transition-colors">
-          {lottery.name}
-        </Link>
-        <span className="text-slate-700">/</span>
-        <span className="text-slate-300">{item.prize.grade}</span>
+        <Link href="/lottery" className="hover:text-[#a78bfa] transition-colors">データベース</Link>
+        {lottery && (
+          <>
+            <span className="text-slate-700">/</span>
+            <Link href={`/lottery/${lottery.slug}`} className="hover:text-[#a78bfa] transition-colors">
+              {lottery.name}
+            </Link>
+          </>
+        )}
+        {item.prize && (
+          <>
+            <span className="text-slate-700">/</span>
+            <span className="text-slate-300">{item.prize.grade}</span>
+          </>
+        )}
       </nav>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -81,8 +91,8 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ slu
           {/* Item Header Card */}
           <div className="card p-6">
             <div className="flex items-start gap-2 mb-1">
-              <div className="series-tag text-[0.6rem]">{lottery.series}</div>
-              <span className="text-[0.6rem] text-slate-600">{item.prize.grade}</span>
+              {item.series && <div className="series-tag text-[0.6rem]">{item.series.name}</div>}
+              {item.prize && <span className="text-[0.6rem] text-slate-600">{item.prize.grade}</span>}
             </div>
             <h1 className="text-xl md:text-2xl font-black text-white mb-1">{item.name}</h1>
             {item.character && (
@@ -223,9 +233,9 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ slu
           <div className="card p-4">
             <h3 className="text-xs font-bold text-white mb-3">アイテム情報</h3>
             <dl className="space-y-2">
-              <InfoRow label="ロット" value={lottery.name} />
-              <InfoRow label="賞" value={item.prize.grade} />
-              {item.prize.quantity && (
+              {lottery && <InfoRow label="ロット" value={lottery.name} />}
+              {item.prize && <InfoRow label="賞" value={item.prize.grade} />}
+              {item.prize?.quantity && (
                 <InfoRow label="当選本数" value={`${item.prize.quantity}個`} />
               )}
               {item.character && (

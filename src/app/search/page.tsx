@@ -33,9 +33,11 @@ export default async function SearchPage({
         OR: [
           { name: { contains: query, mode: "insensitive" } },
           { character: { contains: query, mode: "insensitive" } },
+          { series: { name: { contains: query, mode: "insensitive" } } },
         ],
       },
       include: {
+        series: true,
         prize: { include: { lottery: true } },
         priceReports: { orderBy: { reportedAt: "desc" }, take: 1 },
       },
@@ -45,10 +47,10 @@ export default async function SearchPage({
       where: {
         OR: [
           { name: { contains: query, mode: "insensitive" } },
-          { series: { contains: query, mode: "insensitive" } },
+          { series: { name: { contains: query, mode: "insensitive" } } },
         ],
       },
-      include: { _count: { select: { prizes: true } } },
+      include: { series: true, _count: { select: { prizes: true } } },
       take: 10,
     }),
   ]);
@@ -83,7 +85,7 @@ export default async function SearchPage({
                     href={`/lottery/${lottery.slug}`}
                     className="card p-4 group"
                   >
-                    <div className="series-tag text-[0.6rem] mb-2">{lottery.series}</div>
+                    {lottery.series && <div className="series-tag text-[0.6rem] mb-2">{lottery.series.name}</div>}
                     <h3 className="font-bold text-sm text-slate-200 group-hover:text-white transition-colors">
                       {lottery.name}
                     </h3>
@@ -124,7 +126,7 @@ export default async function SearchPage({
                           {item.name}
                         </div>
                         <div className="text-[0.65rem] text-slate-500">
-                          {item.prize.lottery.name} / {item.prize.grade}
+                          {item.series?.name || item.prize?.lottery?.name || ""}{item.prize ? ` / ${item.prize.grade}` : ""}
                           {item.character && ` / ${item.character}`}
                         </div>
                       </div>

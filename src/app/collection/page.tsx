@@ -18,6 +18,7 @@ export default async function CollectionPage() {
       orderBy: { collections: { _count: "desc" } },
       where: { collections: { some: {} } },
       include: {
+        series: true,
         prize: { include: { lottery: true } },
         priceReports: { orderBy: { reportedAt: "desc" }, take: 1 },
         _count: { select: { collections: true } },
@@ -36,7 +37,7 @@ export default async function CollectionPage() {
           ログインしてあなたのコレクションを始めましょう。
         </p>
         <div className="flex justify-center gap-3">
-          <Link href="/auth/signin" className="btn-primary text-sm">
+          <Link href="/signin" className="btn-primary text-sm">
             ログインして始める
           </Link>
         </div>
@@ -89,9 +90,11 @@ export default async function CollectionPage() {
                       <ItemPlaceholder size="md" />
                     )}
                   </div>
+                  {item.series && (
                   <div className="series-tag text-[0.6rem] mb-1.5 truncate">
-                    {item.prize.lottery.series}
+                    {item.series.name}
                   </div>
+                  )}
                   <div className="text-xs font-bold text-slate-200 leading-snug mb-1 line-clamp-2 group-hover:text-white transition-colors">
                     {item.name}
                   </div>

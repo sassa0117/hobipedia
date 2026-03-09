@@ -15,6 +15,7 @@ export default async function RankingPage() {
   const expensiveItems = await prisma.item.findMany({
     where: { priceReports: { some: {} } },
     include: {
+      series: true,
       prize: { include: { lottery: true } },
       priceReports: { orderBy: { reportedAt: "desc" }, take: 1 },
       _count: { select: { collections: true, priceReports: true } },
@@ -32,6 +33,7 @@ export default async function RankingPage() {
     orderBy: { collections: { _count: "desc" } },
     where: { collections: { some: {} } },
     include: {
+      series: true,
       prize: { include: { lottery: true } },
       priceReports: { orderBy: { reportedAt: "desc" }, take: 1 },
       _count: { select: { collections: true, priceReports: true } },
@@ -44,6 +46,7 @@ export default async function RankingPage() {
     orderBy: { priceReports: { _count: "desc" } },
     where: { priceReports: { some: {} } },
     include: {
+      series: true,
       prize: { include: { lottery: true } },
       priceReports: { orderBy: { reportedAt: "desc" }, take: 1 },
       _count: { select: { collections: true, priceReports: true } },
@@ -105,7 +108,8 @@ type RankingItem = {
   name: string;
   character: string | null;
   imageUrl: string | null;
-  prize: { grade: string; lottery: { name: string; series: string } };
+  series: { name: string } | null;
+  prize: { grade: string; lottery: { name: string } } | null;
   priceReports: { price: number }[];
   _count: { collections: number; priceReports: number };
 };
@@ -172,7 +176,7 @@ function RankingSection({
                     {item.name}
                   </div>
                   <div className="text-[0.6rem] text-slate-500 truncate">
-                    {item.prize.lottery.name} / {item.prize.grade}
+                    {item.series?.name || item.prize?.lottery?.name || ""}{item.prize ? ` / ${item.prize.grade}` : ""}
                   </div>
                 </div>
 

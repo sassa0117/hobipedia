@@ -1,62 +1,32 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
-  
 }
 
 datasource db {
   provider = "postgresql"
 }
 
-// ==================== Auth (NextAuth) ====================
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-// ==================== Users ====================
+// ==================== Auth (Better Auth) ====================
 
 model User {
   id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
   image         String?
+
+  // Profile extensions
+  username      String?   @unique  // @username（URLパス用）
   displayName   String?
   bio           String?   @db.Text
+  coverImageUrl String?
+  twitterHandle String?
+  website       String?
+  isProfilePublic Boolean @default(true)
   locale        String    @default("ja")
   role          Role      @default(USER)
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -65,7 +35,63 @@ model User {
   collections  CollectionItem[]
   priceReports PriceReport[]
   comments     Comment[]
-  itemEdits    ItemEdit[]
+  itemRevisions ItemRevision[]
+  createdItems  Item[]         @relation("ItemCreator")
+
+  // Social
+  followers     Follow[]       @relation("Following")  // この人をフォローしている人
+  following     Follow[]       @relation("Follower")    // この人がフォローしている人
+  likes         Like[]
+  activities    Activity[]
+  notifications Notification[] @relation("NotificationReceiver")
+  actedNotifications Notification[] @relation("NotificationActor")
+
+  @@index([username])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String    // プロバイダー側のID
+  providerId            String    // "google", "twitter", "credential"
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?   @db.Text
+  password              String?   // credential認証時のハッシュ
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String   // メールアドレス等
+  value      String   // 検証コード
+  expiresAt  DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum Role {
@@ -77,37 +103,48 @@ enum Role {
 
 // ==================== Catalog ====================
 
-// A Lottery = 一番くじのロット（例: "一番くじ ワンピース THE BEST EDITION"）
+model Series {
+  id      String  @id @default(cuid())
+  name    String  // 作品名（ワンピース、呪術廻戦 etc）
+  nameEn  String?
+  slug    String  @unique
+  imageUrl String?
+
+  lotteries Lottery[]
+  items     Item[]
+
+  @@index([name])
+}
+
 model Lottery {
   id          String    @id @default(cuid())
-  name        String    // 正式名称
-  nameEn      String?   // English name
+  name        String
+  nameEn      String?
   slug        String    @unique
-  series      String    // 作品名（ワンピース、呪術廻戦 etc）
-  seriesEn    String?
-  maker       String    @default("BANDAI SPIRITS") // メーカー
-  releaseDate DateTime? // 発売日
+  seriesId    String?
+  maker       String    @default("BANDAI SPIRITS")
+  releaseDate DateTime?
   price       Int?      // 1回の価格（円）
   imageUrl    String?
   description String?   @db.Text
-  sourceUrl   String?   // 公式ページURL
+  sourceUrl   String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  series Series? @relation(fields: [seriesId], references: [id])
   prizes Prize[]
 
-  @@index([series])
+  @@index([seriesId])
   @@index([releaseDate])
 }
 
-// A Prize = 賞（A賞、B賞、ラストワン賞 etc）
 model Prize {
   id        String @id @default(cuid())
   lotteryId String
-  grade     String // A賞, B賞, C賞, D賞, E賞, ラストワン賞, etc
-  name      String // アイテム名（例: "マスターライズフィギュア ルフィ太郎"）
+  grade     String
+  name      String
   nameEn    String?
-  quantity  Int?   // 当選本数
+  quantity  Int?
   imageUrl  String?
 
   lottery Lottery @relation(fields: [lotteryId], references: [id], onDelete: Cascade)
@@ -116,41 +153,58 @@ model Prize {
   @@index([lotteryId])
 }
 
-// An Item = 個別アイテム（キャラ違いなど賞の中の具体的な商品）
-// 多くの場合 Prize = Item だが、C賞以下で複数キャラある場合に分かれる
 model Item {
   id          String   @id @default(cuid())
-  prizeId     String
-  name        String   // 具体的な商品名
+  prizeId     String?  // nullable: 一番くじ以外も登録可能
+  seriesId    String?  // 作品シリーズ
+  createdById String?  // 作成者
+
+  name        String
   nameEn      String?
-  character   String?  // キャラクター名
+  character   String?
   characterEn String?
   slug        String   @unique
   imageUrl    String?
-  jan         String?  // JANコード（あれば）
-  category    Category @default(ICHIBAN_KUJI)
-  condition   String?  // 未開封、開封済み etc（デフォルト相場用）
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  jan         String?
+  category    Category @default(OTHER)
+  condition   String?
+  maker       String?  // メーカー
+  releaseDate DateTime? // 発売日
+  description String?  @db.Text
 
-  prize        Prize           @relation(fields: [prizeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prize        Prize?          @relation(fields: [prizeId], references: [id], onDelete: SetNull)
+  series       Series?         @relation(fields: [seriesId], references: [id])
+  createdBy    User?           @relation("ItemCreator", fields: [createdById], references: [id])
   priceReports PriceReport[]
   collections  CollectionItem[]
   comments     Comment[]
-  edits        ItemEdit[]
+  revisions    ItemRevision[]
+  likes        Like[]          @relation("ItemLikes")
 
   @@index([prizeId])
+  @@index([seriesId])
   @@index([character])
   @@index([category])
+  @@index([createdById])
 }
 
 enum Category {
-  ICHIBAN_KUJI  // 一番くじ
-  FIGURE        // フィギュア（プライズ以外）
-  ACSTA         // アクリルスタンド
-  CAN_BADGE     // 缶バッジ
-  PLUSH         // ぬいぐるみ
-  TRADING_CARD  // トレカ
+  ICHIBAN_KUJI    // 一番くじ
+  FIGURE          // フィギュア
+  SCALE_FIGURE    // スケールフィギュア
+  PRIZE_FIGURE    // プライズフィギュア
+  NENDOROID       // ねんどろいど
+  ACSTA           // アクリルスタンド
+  CAN_BADGE       // 缶バッジ
+  PLUSH           // ぬいぐるみ
+  TRADING_CARD    // トレカ
+  RUBBER_STRAP    // ラバーストラップ
+  TAPESTRY        // タペストリー
+  CLEAR_FILE      // クリアファイル
+  TOWEL           // タオル
   OTHER
 }
 
@@ -159,12 +213,14 @@ enum Category {
 model PriceReport {
   id         String      @id @default(cuid())
   itemId     String
-  userId     String?     // null = system/scraper
-  price      Int         // 円
+  userId     String?
+  price      Int
+  priceType  PriceType   @default(SOLD)
   source     PriceSource
-  sourceUrl  String?     // 出品URL
-  condition  String?     // 未開封, 開封済み, 箱なし etc
-  soldAt     DateTime?   // 売れた日時
+  sourceUrl  String?
+  condition  String?
+  storeName  String?     // 店舗発見時の店舗名
+  soldAt     DateTime?
   reportedAt DateTime    @default(now())
   verified   Boolean     @default(false)
 
@@ -173,6 +229,15 @@ model PriceReport {
 
   @@index([itemId, reportedAt])
   @@index([itemId, source])
+  @@index([itemId, priceType])
+}
+
+enum PriceType {
+  SOLD          // 実売（メルカリsold等）
+  LISTING       // 出品中
+  STORE_FIND    // 店舗発見
+  WANT_TO_BUY   // 買いたい希望価格
+  WANT_TO_SELL  // 売りたい希望価格
 }
 
 enum PriceSource {
@@ -183,20 +248,26 @@ enum PriceSource {
   MANDARAKE
   LASHINBAN
   AMAZON
-  USER_REPORT  // ユーザー手動報告
+  RAKUTEN
+  STORE           // 実店舗
+  USER_REPORT
   OTHER
 }
 
 // ==================== Collections ====================
 
 model CollectionItem {
-  id           String           @id @default(cuid())
-  userId       String
-  itemId       String
-  status       CollectionStatus @default(OWNED)
-  purchasePrice Int?            // 購入価格
-  note         String?
-  addedAt      DateTime         @default(now())
+  id            String           @id @default(cuid())
+  userId        String
+  itemId        String
+  status        CollectionStatus @default(OWNED)
+  purchasePrice Int?
+  sellPrice     Int?     // 売りたい価格（FOR_SALE時）
+  buyPrice      Int?     // 買いたい価格（WANTED時）
+  quantity      Int      @default(1)
+  isPublic      Boolean  @default(true)
+  note          String?
+  addedAt       DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -205,10 +276,10 @@ model CollectionItem {
 }
 
 enum CollectionStatus {
-  OWNED     // 持ってる
-  WANTED    // 欲しい
-  FOR_SALE  // 売りたい
-  SOLD      // 売った
+  OWNED
+  WANTED
+  FOR_SALE
+  SOLD
 }
 
 // ==================== Community ====================
@@ -217,9 +288,30 @@ model Comment {
   id        String   @id @default(cuid())
   itemId    String
   userId    String
+  parentId  String?  // 返信対応
   body      String   @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  item     Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
+  likes    Like[]    @relation("CommentLikes")
+
+  @@index([itemId, createdAt])
+  @@index([parentId])
+}
+
+// ==================== Wiki History ====================
+
+model ItemRevision {
+  id        String   @id @default(cuid())
+  itemId    String
+  userId    String
+  snapshot  Json     // 編集時点のItem全フィールドをJSON保存
+  summary   String?  // 編集コメント
+  createdAt DateTime @default(now())
 
   item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -227,19 +319,79 @@ model Comment {
   @@index([itemId, createdAt])
 }
 
-// ==================== Edit History ====================
+// ==================== Social ====================
 
-model ItemEdit {
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Like {
   id        String   @id @default(cuid())
-  itemId    String
   userId    String
-  field     String   // 変更されたフィールド名
-  oldValue  String?  @db.Text
-  newValue  String?  @db.Text
+  itemId    String?
+  commentId String?
   createdAt DateTime @default(now())
 
-  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item    Item?    @relation("ItemLikes", fields: [itemId], references: [id], onDelete: Cascade)
+  comment Comment? @relation("CommentLikes", fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+  @@unique([userId, commentId])
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  userId    String
+  type      ActivityType
+  itemId    String?
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([itemId, createdAt])
+  @@index([userId, createdAt])
+}
+
+enum ActivityType {
+  ADDED_ITEM
+  EDITED_ITEM
+  REPORTED_PRICE
+  ADDED_TO_COLLECTION
+  COMMENTED
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           // 通知を受け取るユーザー
+  type      NotificationType
+  actorId   String?          // アクションを起こしたユーザー
+  itemId    String?
+  commentId String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user  User  @relation("NotificationReceiver", fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("NotificationActor", fields: [actorId], references: [id])
+
+  @@index([userId, read, createdAt])
+}
+
+enum NotificationType {
+  NEW_FOLLOWER
+  ITEM_LIKED
+  COMMENT_LIKED
+  PRICE_REPORT
+  ITEM_EDITED
+  NEW_COMMENT
 }

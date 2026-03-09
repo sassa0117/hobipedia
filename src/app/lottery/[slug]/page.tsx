@@ -28,6 +28,7 @@ export default async function LotteryDetailPage({ params }: { params: Promise<{ 
   const lottery = await prisma.lottery.findUnique({
     where: { slug },
     include: {
+      series: true,
       prizes: {
         orderBy: { grade: "asc" },
         include: {
@@ -67,7 +68,7 @@ export default async function LotteryDetailPage({ params }: { params: Promise<{ 
           </div>
 
           <div className="flex-1">
-            <div className="series-tag text-[0.6rem] mb-2">{lottery.series}</div>
+            {lottery.series && <div className="series-tag text-[0.6rem] mb-2">{lottery.series.name}</div>}
             <h1 className="text-xl md:text-2xl font-black text-white mb-3">{lottery.name}</h1>
 
             {/* Meta grid */}
