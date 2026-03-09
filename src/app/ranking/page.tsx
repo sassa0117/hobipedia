@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import { ItemPlaceholder } from "@/components/ui/placeholders";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "ランキング - Hobipedia",
   description: "一番くじアイテムの相場ランキング。高額・人気・注目アイテムをチェック。",

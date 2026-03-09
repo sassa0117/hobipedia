@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import { FigurePlaceholder } from "@/components/ui/placeholders";
 
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const [lotteryCount, itemCount, priceCount] = await Promise.all([
     prisma.lottery.count(),

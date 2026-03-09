@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { formatDate, formatPrice } from "@/lib/utils";
 import { LotteryPlaceholder } from "@/components/ui/placeholders";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "一番くじ データベース - Hobipedia",
   description: "一番くじの相場データベース。ロット別に賞品の相場をチェック。",

@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import { ItemPlaceholder } from "@/components/ui/placeholders";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "コレクション - Hobipedia",
   description: "あなたのアニメグッズコレクションを管理。持っている・欲しい・売りたいを整理。",
