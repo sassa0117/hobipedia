@@ -4,13 +4,14 @@
 ホビー・おもちゃ・アニメグッズの Wikipedia。誰でも商品を登録・編集でき、相場情報やコレクションをコミュニティで共有するプラットフォーム。
 
 ## Tech Stack
-- **Framework**: Next.js 16 (App Router, Server Components, Server Actions, Turbopack)
+- **Web**: Next.js 16 (App Router, Server Components, Server Actions, Turbopack)
+- **Mobile**: Expo SDK 55 + React Native + Expo Router (mobile/)
 - **Language**: TypeScript
 - **ORM**: Prisma 7 + PostgreSQL (Neon, ap-southeast-1)
 - **Auth**: Better Auth (Google + Twitter/X OAuth)
-- **Styling**: Tailwind CSS v4 (dark theme, CSS custom properties)
-- **Deployment**: Vercel (https://hobipedia.vercel.app)
-- **Image Storage**: Vercel Blob (planned) → Cloudflare R2 (scale時)
+- **Styling**: Web=Tailwind CSS v4, Mobile=StyleSheet (共通ダークテーマ)
+- **Deployment**: Web=Vercel (https://hobipedia.vercel.app), Mobile=EAS Build予定
+- **Image Storage**: Vercel Blob (BLOB_READ_WRITE_TOKEN未設定時はURL入力フォールバック)
 
 ## Prisma 7 Notes (IMPORTANT)
 - No `url` in `datasource` block — connection via `prisma.config.ts`
@@ -23,10 +24,11 @@
 ## Architecture Principles
 1. **Japanese-first**: All UI defaults to Japanese
 2. **Server Components by default**: Only use "use client" when interactivity is needed
-3. **Server Actions for mutations** + API Routes for future Expo app
+3. **Server Actions for mutations** + API Routes for Expo app
 4. **Wiki-style editing**: All users can create/edit items, revisions tracked in ItemRevision (JSON snapshot)
 5. **Service layer**: Business logic in `src/lib/services/`, called by both Server Actions and API Routes
-6. **App化を見据える**: API Routes (`/api/`) を整備。将来 Expo (React Native) からも叩ける設計
+6. **REST API v1**: `/api/v1/` endpoints for mobile app consumption
+7. **Build**: `NODE_OPTIONS="--max-old-space-size=8192"` needed for build (OOM prevention)
 
 ## Domain Model
 ```
@@ -44,73 +46,77 @@ User ← Follow (フォロー/フォロワー)
      ← Notification (通知)
 ```
 
-## Auth (Better Auth)
-- Server: `src/lib/auth.ts` → `betterAuth({ database: prismaAdapter(...) })`
-- Client: `src/lib/auth-client.ts` → `createAuthClient()` with `useSession`, `signIn`, `signOut`
-- API route: `src/app/api/auth/[...all]/route.ts`
-- Session取得 (Server): `auth.api.getSession({ headers: await headers() })`
-- Helper: `src/lib/services/auth-helpers.ts` → `getSessionUser()`, `requireSessionUser()`
-- Google callback: `/api/auth/callback/google`
-- Twitter callback: `/api/auth/callback/twitter`
-
-## Design System
-- **Theme**: Dark (#0c0f1a base, #7c5cfc accent)
-- **Badge colors**: A賞=red, B賞=orange, C賞=yellow, D賞=green, E賞=blue, ラストワン=gold
-- **CSS vars**: --bg-primary, --bg-card, --bg-elevated, --accent, --accent-muted
-- **Components**: .card, .btn-primary, .btn-outline, .data-table, .search-bar, .series-tag
-
 ## Key Files
 ```
 src/
   app/
-    page.tsx                 # Home (stats, recent items)
-    actions.ts               # Server Actions (reportPrice, addToCollection, createItem, updateItem, addComment)
-    signin/page.tsx          # ログインページ (Google + Twitter)
+    page.tsx                 # Home
+    actions.ts               # Server Actions (price, collection, item CRUD, follow, like, notification)
+    signin/page.tsx          # ログインページ
     item/new/page.tsx        # 商品新規登録 (Wiki)
-    item/[slug]/page.tsx     # アイテム詳細 (price stats, history, comments)
-    lottery/page.tsx         # 一番くじ一覧
-    lottery/[slug]/page.tsx  # ロット詳細
-    collection/page.tsx      # コレクション
-    ranking/page.tsx         # ランキング
-    search/page.tsx          # 検索
-    api/auth/[...all]/route.ts  # Better Auth
-    globals.css              # Design system
+    item/[slug]/page.tsx     # アイテム詳細 (price chart, comments, likes)
+    item/[slug]/edit/page.tsx # Wiki編集
+    item/[slug]/history/page.tsx # 編集履歴
+    timeline/page.tsx        # タイムライン
+    notifications/page.tsx   # 通知
+    user/[username]/page.tsx # ユーザープロフィール
+    api/auth/[...all]/       # Better Auth
+    api/items/[slug]/        # Item API
+    api/upload/              # 画像アップロード (POST=Blob, PUT=URL)
+    api/v1/items/            # REST: アイテム一覧・検索
+    api/v1/users/[username]/ # REST: ユーザー情報
+    api/v1/notifications/    # REST: 通知一覧
   components/
-    layout/header.tsx        # Auth-aware header (session, user menu)
-    item/price-report-form.tsx
-    item/collection-button.tsx
-    ui/placeholders.tsx
+    layout/header.tsx        # Auth-aware header
+    item/price-report-form.tsx  # PriceType 5種選択
+    item/collection-button.tsx  # 非公開/価格設定
+    item/comment-form.tsx    # コメント投稿
+    item/image-uploader.tsx  # 画像アップロード/URL入力
+    item/price-chart.tsx     # Recharts 価格推移グラフ
+    social/like-button.tsx   # ハートいいね
+    social/follow-button.tsx # フォロー/解除
+    social/mark-all-read-button.tsx
   lib/
-    auth.ts                  # Better Auth server config
-    auth-client.ts           # Better Auth client (useSession, signIn, signOut)
-    prisma.ts                # Prisma client (PrismaPg adapter)
-    utils.ts                 # formatPrice, formatDate, slugify, cn
-    services/
-      auth-helpers.ts        # getSessionUser, requireSessionUser
-prisma/
-  schema.prisma              # Full data model (auth + catalog + social)
-  prisma.config.ts           # Connection URL from env
-  seed.sql                   # Seed data (3 series, 3 lotteries, 14 items, 27 price reports)
-  clean.sql                  # Truncate all tables
+    auth.ts, auth-client.ts, prisma.ts, utils.ts
+    services/auth-helpers.ts
+
+mobile/                      # Expo React Native アプリ
+  app/
+    _layout.tsx              # Stack navigator
+    (tabs)/_layout.tsx       # Tab navigator (5タブ)
+    (tabs)/index.tsx         # ホーム (アイテム一覧)
+    (tabs)/search.tsx        # 検索
+    (tabs)/timeline.tsx      # タイムライン (要ログイン)
+    (tabs)/notifications.tsx # 通知 (要ログイン)
+    (tabs)/profile.tsx       # プロフィール (要ログイン)
+    item/[slug].tsx          # アイテム詳細
+  lib/
+    api.ts                   # APIクライアント (dev=localhost, prod=Vercel)
+    theme.ts                 # 共通ダークテーマ定数
 ```
 
-## Env Vars
-- `DATABASE_URL` — Neon PostgreSQL connection string
-- `BETTER_AUTH_SECRET` — Auth secret key
-- `BETTER_AUTH_URL` — Base URL (http://localhost:3000 or production URL)
-- `NEXT_PUBLIC_APP_URL` — Public app URL
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth
-- `TWITTER_CLIENT_ID` / `TWITTER_CLIENT_SECRET` — Twitter/X OAuth
-
-## Phase Plan
-- **Phase 1 (current)**: Auth + Wiki + Schema redesign ← DONE
-- **Phase 2**: 相場強化 (PriceType UI, chart), コレクション強化 (非公開, 売りたい/買いたい価格), 画像アップロード
-- **Phase 3**: 交流機能 (Follow, Timeline, Like, Comment投稿, Notification), REST API整備
-- **Phase 4**: Expo (React Native) ネイティブアプリ化
+## Phase Plan (ALL DONE)
+- **Phase 1**: Auth + Wiki + Schema redesign ← DONE
+- **Phase 2**: 相場強化 (PriceType UI, Recharts chart), コレクション強化, 画像アップロード ← DONE
+- **Phase 3**: 交流機能 (Follow, Timeline, Like, Notification), REST API v1 ← DONE
+- **Phase 4**: Expo React Native モバイルアプリ ← DONE (初期実装)
 
 ## Commands
+### Web
 - `npm run dev` — Start dev server (Turbopack)
-- `npx prisma db push` — Push schema to DB (development)
+- `NODE_OPTIONS="--max-old-space-size=8192" npx next build` — Production build
+- `npx prisma db push` — Push schema to DB
 - `npx prisma generate` — Generate client
-- `npx prisma db execute --file prisma/seed.sql` — Seed data
-- `npx prisma studio` — Open Prisma Studio
+
+### Mobile
+- `cd mobile && npm start` — Start Expo dev server
+- `cd mobile && npm run android` — Android emulator
+- `cd mobile && npm run web` — Web preview
+
+## Env Vars
+- `DATABASE_URL` — Neon PostgreSQL
+- `BETTER_AUTH_SECRET` — Auth secret
+- `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` — Base URLs
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth
+- `TWITTER_CLIENT_ID` / `TWITTER_CLIENT_SECRET` — Twitter/X OAuth
+- `BLOB_READ_WRITE_TOKEN` — Vercel Blob (optional, fallback to URL input)
