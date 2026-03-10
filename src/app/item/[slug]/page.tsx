@@ -6,6 +6,8 @@ import { FigurePlaceholder } from "@/components/ui/placeholders";
 import { PriceReportForm } from "@/components/item/price-report-form";
 import { CollectionButton } from "@/components/item/collection-button";
 import { CommentForm } from "@/components/item/comment-form";
+import { ImageUploader } from "@/components/item/image-uploader";
+import { PriceChart } from "@/components/item/price-chart";
 
 const SOURCE_LABELS: Record<string, string> = {
   MERCARI: "メルカリ",
@@ -175,6 +177,25 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ slu
             </div>
           </div>
 
+          {/* Price Chart */}
+          {item.priceReports.length >= 2 && (
+            <div className="card overflow-hidden">
+              <div className="px-5 py-3 border-b border-white/[0.06]" style={{ background: "var(--bg-elevated)" }}>
+                <h2 className="text-sm font-bold text-white">価格推移</h2>
+              </div>
+              <div className="p-4">
+                <PriceChart
+                  reports={item.priceReports.map((r) => ({
+                    date: r.reportedAt.toISOString().split("T")[0],
+                    price: r.price,
+                    priceType: r.priceType,
+                    source: SOURCE_LABELS[r.source] || r.source,
+                  }))}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Price History Table */}
           <div className="card overflow-hidden">
             <div className="px-5 py-3 border-b border-white/[0.06]" style={{ background: "var(--bg-elevated)" }}>
@@ -301,6 +322,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ slu
                 <FigurePlaceholder />
               )}
             </div>
+            <ImageUploader itemId={item.id} currentImageUrl={item.imageUrl} />
           </div>
 
           {/* Action Buttons */}
