@@ -53,6 +53,7 @@ export function Header() {
           <NavLink href="/lottery">一番くじ</NavLink>
           <NavLink href="/ranking">ランキング</NavLink>
           <NavLink href="/collection">コレクション</NavLink>
+          {session && <NavLink href="/timeline">タイムライン</NavLink>}
         </nav>
 
         {/* Auth */}
@@ -90,6 +91,8 @@ export function Header() {
                     <div className="py-1">
                       <MenuLink href="/settings" onClick={() => setShowMenu(false)}>プロフィール設定</MenuLink>
                       <MenuLink href="/collection" onClick={() => setShowMenu(false)}>マイコレクション</MenuLink>
+                      <MenuLink href="/notifications" onClick={() => setShowMenu(false)}>通知</MenuLink>
+                      <MenuLink href="/timeline" onClick={() => setShowMenu(false)}>タイムライン</MenuLink>
                       <MenuLink href="/item/new" onClick={() => setShowMenu(false)}>商品を登録</MenuLink>
                     </div>
                     <div className="border-t border-white/[0.06] py-1">

@@ -8,6 +8,8 @@ import { CollectionButton } from "@/components/item/collection-button";
 import { CommentForm } from "@/components/item/comment-form";
 import { ImageUploader } from "@/components/item/image-uploader";
 import { PriceChart } from "@/components/item/price-chart";
+import { LikeButton } from "@/components/social/like-button";
+import { getSessionUser } from "@/lib/services/auth-helpers";
 
 const SOURCE_LABELS: Record<string, string> = {
   MERCARI: "メルカリ",
@@ -66,11 +68,19 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ slu
           },
         },
       },
-      _count: { select: { collections: true, priceReports: true, revisions: true } },
+      _count: { select: { collections: true, priceReports: true, revisions: true, likes: true } },
     },
   });
 
   if (!item) notFound();
+
+  // Check if current user liked this item
+  const me = await getSessionUser();
+  const userLiked = me
+    ? !!(await prisma.like.findUnique({
+        where: { userId_itemId: { userId: me.id, itemId: item.id } },
+      }))
+    : false;
 
   const lottery = item.prize?.lottery;
 
@@ -155,8 +165,9 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ slu
               </div>
             )}
 
-            {/* Collection stats + creator */}
+            {/* Stats + Like */}
             <div className="flex items-center gap-4 mt-4 pt-4 border-t border-white/[0.06]">
+              <LikeButton itemId={item.id} initialLiked={userLiked} initialCount={item._count.likes} />
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-[#22c55e]" />
                 <span className="text-xs text-slate-400">

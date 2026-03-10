@@ -265,7 +265,110 @@ export async function addComment(formData: FormData) {
     },
   });
 
-  const item = await prisma.item.findUnique({ where: { id: itemId } });
-  if (item) revalidatePath(`/item/${item.slug}`);
+  const commentedItem = await prisma.item.findUnique({ where: { id: itemId } });
+  if (commentedItem) revalidatePath(`/item/${commentedItem.slug}`);
+  return { success: true };
+}
+
+// ===== Follow =====
+
+export async function toggleFollow(targetUserId: string) {
+  const user = await getSessionUser();
+  if (!user) return { error: "ログインが必要です" };
+  if (user.id === targetUserId) return { error: "自分をフォローできません" };
+
+  const existing = await prisma.follow.findUnique({
+    where: { followerId_followingId: { followerId: user.id, followingId: targetUserId } },
+  });
+
+  if (existing) {
+    await prisma.follow.delete({ where: { id: existing.id } });
+    revalidatePath(`/user`);
+    return { followed: false };
+  }
+
+  await prisma.follow.create({
+    data: { followerId: user.id, followingId: targetUserId },
+  });
+
+  await prisma.notification.create({
+    data: { userId: targetUserId, type: "NEW_FOLLOWER", actorId: user.id },
+  });
+
+  revalidatePath(`/user`);
+  return { followed: true };
+}
+
+// ===== Like =====
+
+export async function toggleLikeItem(itemId: string) {
+  const user = await getSessionUser();
+  if (!user) return { error: "ログインが必要です" };
+
+  const existing = await prisma.like.findUnique({
+    where: { userId_itemId: { userId: user.id, itemId } },
+  });
+
+  if (existing) {
+    await prisma.like.delete({ where: { id: existing.id } });
+    return { liked: false };
+  }
+
+  await prisma.like.create({ data: { userId: user.id, itemId } });
+
+  const likedItem = await prisma.item.findUnique({ where: { id: itemId }, select: { createdById: true } });
+  if (likedItem?.createdById && likedItem.createdById !== user.id) {
+    await prisma.notification.create({
+      data: { userId: likedItem.createdById, type: "ITEM_LIKED", actorId: user.id, itemId },
+    });
+  }
+
+  return { liked: true };
+}
+
+export async function toggleLikeComment(commentId: string) {
+  const user = await getSessionUser();
+  if (!user) return { error: "ログインが必要です" };
+
+  const existing = await prisma.like.findUnique({
+    where: { userId_commentId: { userId: user.id, commentId } },
+  });
+
+  if (existing) {
+    await prisma.like.delete({ where: { id: existing.id } });
+    return { liked: false };
+  }
+
+  await prisma.like.create({ data: { userId: user.id, commentId } });
+
+  const likedComment = await prisma.comment.findUnique({ where: { id: commentId }, select: { userId: true } });
+  if (likedComment?.userId && likedComment.userId !== user.id) {
+    await prisma.notification.create({
+      data: { userId: likedComment.userId, type: "COMMENT_LIKED", actorId: user.id, commentId },
+    });
+  }
+
+  return { liked: true };
+}
+
+// ===== Notification =====
+
+export async function markNotificationsRead(ids?: string[]) {
+  const user = await getSessionUser();
+  if (!user) return { error: "ログインが必要です" };
+
+  if (ids && ids.length > 0) {
+    await prisma.notification.updateMany({
+      where: { id: { in: ids }, userId: user.id },
+      data: { read: true },
+    });
+  } else {
+    await prisma.notification.updateMany({
+      where: { userId: user.id, read: false },
+      data: { read: true },
+    });
+  }
+
+  revalidatePath("/notifications");
   return { success: true };
 }
