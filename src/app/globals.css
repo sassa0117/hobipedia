@@ -5,46 +5,58 @@
 }
 
 /*
- * Hobipedia Design System
- * Ref: Discogs (データベース感), MFC (コレクター向けカード), PriceCharting (相場可視化), 一番くじ公式 (賞ヒエラルキー)
- * Palette: ダーク系ベース + 紫アクセント + ゴールドサブアクセント
+ * Hobipedia Design System v2
+ * コンセプト: ホビーショップの棚を覗いているような温かさ + データベースの信頼感
+ * Ref: 駿河屋(情報密度), MFC(コレクター愛), AmiAmi(商品カタログ感)
  */
 
 :root {
-  /* Base */
-  --bg-primary: #0c0f1a;
-  --bg-secondary: #12162b;
-  --bg-card: #171d36;
-  --bg-card-hover: #1c2440;
-  --bg-elevated: #1f2847;
+  /* Base - 少し青みを抑えた暖色寄りダーク */
+  --bg-primary: #111113;
+  --bg-secondary: #18181b;
+  --bg-card: #1e1e22;
+  --bg-card-hover: #26262b;
+  --bg-elevated: #2a2a30;
+  --bg-input: #1a1a1e;
 
-  /* Accent */
-  --accent: #7c5cfc;
-  --accent-light: #a78bfa;
-  --accent-muted: rgba(124, 92, 252, 0.12);
-  --accent-border: rgba(124, 92, 252, 0.25);
+  /* Accent - オレンジ系（ホビーショップの暖色照明イメージ） */
+  --accent: #f97316;
+  --accent-hover: #fb923c;
+  --accent-muted: rgba(249, 115, 22, 0.1);
+  --accent-border: rgba(249, 115, 22, 0.25);
 
-  /* Gold (ラストワン・レア) */
-  --gold: #f59e0b;
-  --gold-muted: rgba(245, 158, 11, 0.12);
+  /* Sub accent - ティール（情報・リンク用） */
+  --link: #2dd4bf;
+  --link-hover: #5eead4;
+  --link-muted: rgba(45, 212, 191, 0.1);
 
-  /* Red (一番くじブランド) */
-  --kuji-red: #ef4444;
-  --kuji-red-muted: rgba(239, 68, 68, 0.12);
+  /* Gold (レア・ラストワン) */
+  --gold: #fbbf24;
+  --gold-muted: rgba(251, 191, 36, 0.1);
+
+  /* Red (一番くじブランド・警告) */
+  --kuji-red: #f43f5e;
+  --kuji-red-muted: rgba(244, 63, 94, 0.1);
 
   /* Price */
   --price-up: #22c55e;
   --price-down: #ef4444;
-  --price-neutral: #94a3b8;
+  --price-neutral: #a1a1aa;
 
-  /* Text */
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  /* Text - コントラスト高め */
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-dim: #52525b;
 
   /* Border */
-  --border: rgba(148, 163, 184, 0.1);
-  --border-hover: rgba(124, 92, 252, 0.3);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(249, 115, 22, 0.3);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
 }
 
 body {
@@ -52,117 +64,246 @@ body {
   color: var(--text-primary);
 }
 
-/* ===== Card System (MFC + Discogs hybrid) ===== */
+/* ===== Card System ===== */
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  transition: all 0.2s ease;
+  border-radius: var(--radius-lg);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 .card:hover {
-  background: var(--bg-card-hover);
   border-color: var(--border-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 1px var(--border-hover), 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+/* カードリンク用 - ホバーで浮かない、枠だけ光る */
+a.card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+a.card:hover {
+  background: var(--bg-card-hover);
+  transform: none;
 }
 
-/* ===== Prize Grade Badges (一番くじ公式 ref) ===== */
-.badge-a { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
-.badge-b { background: linear-gradient(135deg, #f97316, #ea580c); color: white; }
-.badge-c { background: linear-gradient(135deg, #eab308, #ca8a04); color: white; }
-.badge-d { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }
-.badge-e { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
-.badge-last { background: linear-gradient(135deg, #f59e0b, #d97706); color: #1a1a1a; }
+/* ===== Prize Grade Badges ===== */
+.badge-a { background: #f43f5e; color: white; font-weight: 800; }
+.badge-b { background: #f97316; color: white; font-weight: 800; }
+.badge-c { background: #eab308; color: #1a1a1a; font-weight: 800; }
+.badge-d { background: #22c55e; color: white; font-weight: 800; }
+.badge-e { background: #3b82f6; color: white; font-weight: 800; }
+.badge-last {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #1a1a1a;
+  font-weight: 800;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.3);
+}
+[class^="badge-"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+}
 
 /* ===== Buttons ===== */
 .btn-primary {
-  background: linear-gradient(135deg, #7c5cfc, #6d28d9);
-  color: white;
+  background: var(--accent);
+  color: #fff;
   font-weight: 700;
-  border-radius: 10px;
-  padding: 0.75rem 1.5rem;
-  transition: all 0.2s;
-  box-shadow: 0 4px 16px rgba(124, 92, 252, 0.25);
+  border-radius: var(--radius);
+  padding: 0.625rem 1.25rem;
+  transition: background 0.15s, box-shadow 0.15s;
+  border: none;
+  cursor: pointer;
 }
 .btn-primary:hover {
-  box-shadow: 0 6px 24px rgba(124, 92, 252, 0.4);
-  transform: translateY(-1px);
+  background: var(--accent-hover);
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
 }
 
 .btn-outline {
   background: transparent;
-  color: var(--accent-light);
-  font-weight: 700;
-  border: 2px solid var(--accent-border);
-  border-radius: 10px;
-  padding: 0.75rem 1.5rem;
-  transition: all 0.2s;
+  color: var(--text-secondary);
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.625rem 1.25rem;
+  transition: all 0.15s;
+  cursor: pointer;
 }
 .btn-outline:hover {
-  background: var(--accent-muted);
-  border-color: var(--accent);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.03);
 }
 
-/* ===== Data Table (PriceCharting ref) ===== */
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.btn-ghost:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ===== Data Table ===== */
 .data-table {
   width: 100%;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
 }
 .data-table th {
   color: var(--text-muted);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.625rem 0.75rem;
+  letter-spacing: 0.06em;
+  padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--border);
   text-align: left;
+  white-space: nowrap;
 }
 .data-table td {
-  padding: 0.625rem 0.75rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
 }
 .data-table tbody tr:hover td {
-  background: var(--accent-muted);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-/* ===== Price Display (PriceCharting ref) ===== */
+/* ===== Price Display ===== */
 .price-up { color: var(--price-up); }
 .price-down { color: var(--price-down); }
 .price-neutral { color: var(--price-neutral); }
 
-/* ===== Collection Stats (MFC ref: Have/Want) ===== */
+/* ===== Collection Stats ===== */
 .stat-owned { color: #22c55e; }
 .stat-wanted { color: #f472b6; }
 .stat-forsale { color: #38bdf8; }
 
-/* ===== Search Bar (Discogs ref: oversized search) ===== */
+/* ===== Search Bar ===== */
 .search-bar {
-  background: var(--bg-card);
+  background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  transition: all 0.2s;
+  border-radius: var(--radius);
+  transition: all 0.15s;
 }
 .search-bar:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-muted);
+  box-shadow: 0 0 0 2px var(--accent-muted);
 }
 
 /* ===== Scrollbar ===== */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg-elevated); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
-/* ===== Series Badge (作品テーマカラー, 一番くじ公式 ref) ===== */
+/* ===== Series Badge ===== */
 .series-tag {
   display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+/* ===== Tag ===== */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+/* ===== Stat Card (ホーム用) ===== */
+.stat-card {
+  text-align: center;
+  padding: 1rem;
+}
+.stat-card .stat-value {
+  font-size: 1.75rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.stat-card .stat-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  font-weight: 500;
+}
+
+/* ===== Section Header ===== */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.section-header h2 {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.section-header a {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: color 0.15s;
+}
+.section-header a:hover {
+  color: var(--accent);
+}
+
+/* ===== Chip (カテゴリフィルタ等) ===== */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
   font-size: 0.7rem;
   font-weight: 600;
-  padding: 0.2rem 0.6rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 100px;
-  background: var(--accent-muted);
-  color: var(--accent-light);
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.chip:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ===== Utility ===== */
+.text-link {
+  color: var(--link);
+  transition: color 0.15s;
+}
+.text-link:hover {
+  color: var(--link-hover);
+}
+.text-accent {
+  color: var(--accent);
 }

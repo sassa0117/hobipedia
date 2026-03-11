@@ -1,193 +1,265 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
-import { FigurePlaceholder } from "@/components/ui/placeholders";
 
 export const dynamic = "force-dynamic";
 
+const CATEGORY_LABELS: Record<string, string> = {
+  ICHIBAN_KUJI: "一番くじ",
+  FIGURE: "フィギュア",
+  SCALE_FIGURE: "スケールフィギュア",
+  PRIZE_FIGURE: "プライズフィギュア",
+  NENDOROID: "ねんどろいど",
+  ACSTA: "アクスタ",
+  PLUSH: "ぬいぐるみ",
+  TRADING_CARD: "トレカ",
+  OTHER: "その他",
+};
+
 export default async function Home() {
-  const [lotteryCount, itemCount, priceCount, seriesCount] = await Promise.all([
-    prisma.lottery.count(),
+  const [itemCount, priceCount, seriesCount, lotteryCount] = await Promise.all([
     prisma.item.count(),
     prisma.priceReport.count(),
     prisma.series.count(),
+    prisma.lottery.count(),
   ]);
 
   const recentItems = await prisma.item.findMany({
-    take: 6,
+    take: 12,
     orderBy: { createdAt: "desc" },
     include: {
       series: true,
       prize: { include: { lottery: true } },
       priceReports: { orderBy: { reportedAt: "desc" }, take: 1 },
+      _count: { select: { collections: true, likes: true } },
     },
   });
 
+  // 最近の相場報告（アクティビティ的に表示）
+  const recentPrices = await prisma.priceReport.findMany({
+    take: 8,
+    orderBy: { reportedAt: "desc" },
+    include: {
+      item: { select: { name: true, slug: true, category: true } },
+      user: { select: { name: true } },
+    },
+  });
+
+  // カテゴリ別件数
+  const categoryCounts = await prisma.item.groupBy({
+    by: ["category"],
+    _count: true,
+    orderBy: { _count: { category: "desc" } },
+  });
+
   return (
-    <div>
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#7c5cfc]/10 via-transparent to-transparent" />
-        <div className="max-w-7xl mx-auto px-4 pt-20 pb-16 relative">
-          <div className="text-center max-w-2xl mx-auto">
-            <div className="series-tag mb-6 inline-block">EARLY ACCESS</div>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white mb-4 leading-tight">
-              ホビーグッズの<br />
-              <span className="bg-gradient-to-r from-[#7c5cfc] to-[#a78bfa] bg-clip-text text-transparent">
-                みんなで作るWiki
-              </span>
-            </h1>
-            <p className="text-slate-400 text-lg mb-8 leading-relaxed">
-              フィギュア・一番くじ・トレカの情報と相場をコミュニティで共有。<br className="hidden md:block" />
-              誰でも商品を登録・編集できるホビーのWikipedia。
-            </p>
-            <div className="flex justify-center gap-3">
+    <div className="max-w-6xl mx-auto px-4 py-6">
+      {/* ===== Hero - シンプルに1行 + 検索 ===== */}
+      <section className="mb-8">
+        <h1 className="text-2xl md:text-3xl font-black mb-2" style={{ color: "var(--text-primary)" }}>
+          ホビーグッズの<span style={{ color: "var(--accent)" }}>相場Wiki</span>
+        </h1>
+        <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
+          フィギュア・一番くじ・トレカの情報と相場をみんなで共有するデータベース
+        </p>
+
+        {/* Stats - 横並び、コンパクト */}
+        <div className="flex items-center gap-6 mb-5">
+          <Stat value={itemCount} label="アイテム" />
+          <Stat value={priceCount} label="相場データ" />
+          <Stat value={seriesCount} label="シリーズ" />
+          <Stat value={lotteryCount} label="一番くじ" />
+        </div>
+
+        {/* カテゴリチップ */}
+        <div className="flex flex-wrap gap-1.5">
+          {categoryCounts.map((c) => (
+            <Link
+              key={c.category}
+              href={`/search?category=${c.category}`}
+              className="chip"
+            >
+              {CATEGORY_LABELS[c.category] || c.category}
+              <span style={{ color: "var(--text-dim)" }}>{c._count}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* ===== メインカラム: アイテムグリッド ===== */}
+        <div className="lg:col-span-2">
+          <div className="section-header">
+            <h2>最近のアイテム</h2>
+            <Link href="/search">すべて見る →</Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+            {recentItems.map((item) => {
+              const latestPrice = item.priceReports[0];
+              return (
+                <Link key={item.id} href={`/item/${item.slug}`} className="card p-0 overflow-hidden group">
+                  {/* 画像 */}
+                  <div className="aspect-square relative overflow-hidden" style={{ background: "var(--bg-elevated)" }}>
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.name}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <svg className="w-10 h-10" style={{ color: "var(--text-dim)", opacity: 0.3 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                      </div>
+                    )}
+                    {/* カテゴリバッジ */}
+                    {item.prize && (
+                      <span className="absolute top-1.5 left-1.5 text-[0.55rem] font-bold px-1.5 py-0.5 rounded"
+                        style={{ background: "rgba(0,0,0,0.7)", color: "var(--accent)" }}>
+                        {item.prize.grade}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 情報 */}
+                  <div className="p-2.5">
+                    {item.series && (
+                      <div className="text-[0.6rem] font-semibold mb-0.5 truncate" style={{ color: "var(--text-dim)" }}>
+                        {item.series.name}
+                      </div>
+                    )}
+                    <div className="text-xs font-bold leading-snug mb-1.5 line-clamp-2 transition-colors"
+                      style={{ color: "var(--text-primary)" }}>
+                      {item.name}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      {latestPrice ? (
+                        <span className="text-sm font-black" style={{ color: "var(--price-up)" }}>
+                          {formatPrice(latestPrice.price)}
+                        </span>
+                      ) : (
+                        <span className="text-[0.6rem]" style={{ color: "var(--text-dim)" }}>相場なし</span>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        {item._count.likes > 0 && (
+                          <span className="text-[0.6rem] flex items-center gap-0.5" style={{ color: "var(--text-dim)" }}>
+                            ♥ {item._count.likes}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+
+          {recentItems.length === 0 && (
+            <div className="card p-8 text-center">
+              <p className="text-sm mb-3" style={{ color: "var(--text-muted)" }}>まだアイテムがありません</p>
               <Link href="/item/new" className="btn-primary text-sm">
-                商品を登録する
+                最初のアイテムを登録する
               </Link>
-              <Link href="/lottery" className="btn-outline text-sm">
-                データベースを見る
+            </div>
+          )}
+        </div>
+
+        {/* ===== サイドバー ===== */}
+        <div className="space-y-4">
+          {/* CTAカード */}
+          <div className="card p-4" style={{ borderColor: "var(--accent-border)" }}>
+            <h3 className="text-sm font-bold mb-1.5" style={{ color: "var(--text-primary)" }}>
+              Hobipediaに参加しよう
+            </h3>
+            <p className="text-xs leading-relaxed mb-3" style={{ color: "var(--text-muted)" }}>
+              アイテムの登録・相場報告・コレクション管理。誰でも編集できるホビーのWikipedia。
+            </p>
+            <div className="flex gap-2">
+              <Link href="/item/new" className="btn-primary text-xs flex-1 text-center">
+                登録する
+              </Link>
+              <Link href="/signin" className="btn-outline text-xs flex-1 text-center">
+                ログイン
               </Link>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Stats - Discogs style: show database scale */}
-      <section className="border-y border-white/[0.06]" style={{ background: "var(--bg-secondary)" }}>
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-4 gap-8 text-center">
-            <StatBlock value={seriesCount.toString()} label="シリーズ" />
-            <StatBlock value={lotteryCount.toString()} label="ロット" />
-            <StatBlock value={itemCount.toString()} label="アイテム" />
-            <StatBlock value={priceCount.toString()} label="相場データ" />
+          {/* 最近の相場報告 */}
+          <div className="card overflow-hidden">
+            <div className="px-4 py-2.5 border-b" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
+              <h3 className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>最近の相場報告</h3>
+            </div>
+            <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+              {recentPrices.map((report) => (
+                <Link
+                  key={report.id}
+                  href={`/item/${report.item.slug}`}
+                  className="block px-4 py-2.5 transition-colors hover:bg-white/[0.02]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium truncate" style={{ color: "var(--text-primary)" }}>
+                        {report.item.name}
+                      </div>
+                      <div className="text-[0.6rem]" style={{ color: "var(--text-dim)" }}>
+                        {PRICE_TYPE_SHORT[report.priceType] || report.priceType}
+                        {report.user && ` · ${report.user.name}`}
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold shrink-0" style={{ color: "var(--price-up)" }}>
+                      {formatPrice(report.price)}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+              {recentPrices.length === 0 && (
+                <div className="px-4 py-6 text-center text-xs" style={{ color: "var(--text-dim)" }}>
+                  まだ相場報告がありません
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 使い方ガイド */}
+          <div className="card p-4 space-y-3">
+            <h3 className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>Hobipediaの使い方</h3>
+            <GuideStep num={1} text="アイテムを検索 or 新規登録" />
+            <GuideStep num={2} text="相場データを報告・共有" />
+            <GuideStep num={3} text="コレクションで管理" />
           </div>
         </div>
-      </section>
-
-      {/* Recent Items - MFC style: image-rich card grid */}
-      <section className="max-w-7xl mx-auto px-4 py-12">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">最近追加されたアイテム</h2>
-          <Link href="/lottery" className="text-sm text-[#a78bfa] hover:text-[#c4b5fd] transition-colors">
-            すべて見る &rarr;
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {recentItems.map((item) => {
-            const latestPrice = item.priceReports[0];
-            const seriesName = item.series?.name || "";
-            return (
-              <Link
-                key={item.id}
-                href={`/item/${item.slug}`}
-                className="card p-3 group"
-              >
-                {/* Image placeholder */}
-                <div className="aspect-square rounded-lg mb-3 flex items-center justify-center text-3xl"
-                  style={{ background: "var(--bg-elevated)" }}>
-                  {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover rounded-lg" />
-                  ) : (
-                    <FigurePlaceholder />
-                  )}
-                </div>
-                {/* Series tag */}
-                {seriesName && (
-                <div className="series-tag text-[0.6rem] mb-1.5 truncate">
-                  {seriesName}
-                </div>
-                )}
-                {/* Name */}
-                <div className="text-xs font-bold text-slate-200 leading-snug mb-1 line-clamp-2 group-hover:text-white transition-colors">
-                  {item.name}
-                </div>
-                {/* Character */}
-                {item.character && (
-                  <div className="text-[0.65rem] text-slate-500 mb-1.5 truncate">{item.character}</div>
-                )}
-                {/* Price */}
-                {latestPrice ? (
-                  <div className="text-sm font-black text-[#22c55e]">
-                    {formatPrice(latestPrice.price)}
-                  </div>
-                ) : (
-                  <div className="text-[0.65rem] text-slate-600">相場データなし</div>
-                )}
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="max-w-7xl mx-auto px-4 py-12">
-        <div className="grid md:grid-cols-3 gap-4">
-          <FeatureCard
-            icon={<WikiIcon />}
-            title="みんなで作るWiki"
-            desc="誰でも商品を登録・編集できる。フィギュア、一番くじ、トレカ、ぬいぐるみ。ホビーの百科事典をみんなで作ろう。"
-          />
-          <FeatureCard
-            icon={<PriceIcon />}
-            title="リアルタイム相場"
-            desc="メルカリ・ヤフオク・駿河屋の実売データ、店舗発見価格、売りたい/買いたい希望価格をみんなで共有。"
-          />
-          <FeatureCard
-            icon={<CollectionIcon />}
-            title="コレクション管理"
-            desc="持っている・欲しい・売りたいをワンタップ管理。公開/非公開の切り替えも自由。"
-          />
-        </div>
-      </section>
+      </div>
     </div>
   );
 }
 
-function StatBlock({ value, label }: { value: string; label: string }) {
+const PRICE_TYPE_SHORT: Record<string, string> = {
+  SOLD: "実売",
+  LISTING: "出品中",
+  STORE_FIND: "店舗発見",
+  WANT_TO_BUY: "買希望",
+  WANT_TO_SELL: "売希望",
+};
+
+function Stat({ value, label }: { value: number; label: string }) {
   return (
     <div>
-      <div className="text-2xl md:text-3xl font-black bg-gradient-to-r from-[#7c5cfc] to-[#a78bfa] bg-clip-text text-transparent">
-        {value}
-      </div>
-      <div className="text-xs text-slate-500 mt-1">{label}</div>
+      <span className="text-lg font-black" style={{ color: "var(--text-primary)" }}>
+        {value.toLocaleString()}
+      </span>
+      <span className="text-[0.65rem] ml-1" style={{ color: "var(--text-dim)" }}>{label}</span>
     </div>
   );
 }
 
-function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+function GuideStep({ num, text }: { num: number; text: string }) {
   return (
-    <div className="card p-5">
-      <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-3"
-        style={{ background: "var(--accent-muted)" }}>
-        {icon}
+    <div className="flex items-start gap-2.5">
+      <div className="w-5 h-5 rounded-full flex items-center justify-center text-[0.6rem] font-bold shrink-0"
+        style={{ background: "var(--accent-muted)", color: "var(--accent)" }}>
+        {num}
       </div>
-      <h3 className="text-sm font-bold text-white mb-2">{title}</h3>
-      <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
+      <span className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{text}</span>
     </div>
-  );
-}
-
-function PriceIcon() {
-  return (
-    <svg className="w-5 h-5 text-[#a78bfa]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-    </svg>
-  );
-}
-
-function CollectionIcon() {
-  return (
-    <svg className="w-5 h-5 text-[#a78bfa]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-    </svg>
-  );
-}
-
-function WikiIcon() {
-  return (
-    <svg className="w-5 h-5 text-[#a78bfa]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-    </svg>
   );
 }
